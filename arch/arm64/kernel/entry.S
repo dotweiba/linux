@@ -284,6 +284,7 @@ ENDPROC(el1_error_invalid)
 	.align	6
 el1_sync:
 	kernel_entry 1
+ENTRY(true_el1_sync)
 	mrs	x1, esr_el1			// read the syndrome register
 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
@@ -310,6 +311,10 @@ el1_da:
 	enable_irq
 1:
 	mov	x2, sp				// struct pt_regs
+	mrs x3, elr_el1
+	and x24, x1, #ESR_ISS_KVM_MASK	//kvmdef
+	cmp x24 ,#ESR_ISS_KVM_TAG
+	b.eq	do_kvmmem_abort
 	bl	do_mem_abort
 
 	// disable interrupts before pulling preserved data off the stack
@@ -343,11 +348,13 @@ el1_dbg:
 	kernel_exit 1
 el1_inv:
 	// TODO: add support for undefined instructions in kernel mode
+	mrs	x3, far_el1 //kvmdef
 	enable_dbg
 	mov	x0, sp
 	mov	x2, x1
 	mov	x1, #BAD_SYNC
 	b	bad_mode
+ENDPROC(true_el1_sync)
 ENDPROC(el1_sync)
 
 	.align	6
@@ -544,6 +551,7 @@ el0_dbg:
 	ct_user_exit
 	b	ret_to_user
 el0_inv:
+	mrs	x3, far_el1 //kvmdef
 	enable_dbg
 	ct_user_exit
 	mov	x0, sp

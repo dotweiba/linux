@@ -15,9 +15,11 @@
 #include <linux/writeback.h>
 #include <linux/buffer_head.h>
 #include <linux/falloc.h>
+#include <linux/kvmdef.h>
 
 #include <asm/ioctls.h>
 
+#include <linux/timekeeping.h>
 /* So that the fiemap access checks can't overflow on 32 bit machines. */
 #define FIEMAP_MAX_EXTENTS	(UINT_MAX / sizeof(struct fiemap_extent))
 
@@ -32,6 +34,7 @@
  *
  * Returns 0 on success, -errno on error.
  */
+extern int KVMDEF_ON;
 static long vfs_ioctl(struct file *filp, unsigned int cmd,
 		      unsigned long arg)
 {
@@ -39,8 +42,32 @@ static long vfs_ioctl(struct file *filp, unsigned int cmd,
 
 	if (!filp->f_op->unlocked_ioctl)
 		goto out;
+#ifdef CONFIG_KVMDEF
+	KVMDEF_ON=1;
+
+	if(!strcmp(filp->f_path.dentry->d_name.name,"kvm")&&
+			!check_pg((unsigned long)filp->private_data, KVMPG, _IS_VALID))
+	{
+		pr_err("filp: %s\n",filp->f_path.dentry->d_name.name);
+
+		kvmdef_map_range(filp->private_data,filp->private_data+1);
+	}
+#endif
+#ifdef TS_EVAL
+	struct timespec tv_vfs;
+	getnstimeofday(&tv_vfs);
+	long t_vfs= tv_vfs.tv_nsec;
+	pr_err(" vfs_ioctl: tv_sec+tv_usec %ld ns ENTRY \n", t_vfs);
+#endif
 
 	error = filp->f_op->unlocked_ioctl(filp, cmd, arg);
+
+#ifdef TS_EVAL
+	struct timespec tv1_vfs;
+	getnstimeofday(&tv1_vfs);
+	long t1_vfs= tv1_vfs.tv_nsec;
+	pr_err(" vfs_ioctl: tv_sec+tv_usec %ld ns RET \n", t1_vfs);
+#endif
 	if (error == -ENOIOCTLCMD)
 		error = -ENOTTY;
  out:

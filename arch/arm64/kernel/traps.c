@@ -31,6 +31,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/syscalls.h>
+#include <linux/kvmdef.h>
 
 #include <asm/atomic.h>
 #include <asm/bug.h>
@@ -41,6 +42,11 @@
 #include <asm/stacktrace.h>
 #include <asm/exception.h>
 #include <asm/system_misc.h>
+#include <asm/kvmdef_asm.h>
+
+#ifdef CONFIG_KVMDEF
+extern int KVMDEF_ON;
+#endif
 
 static const char *handler[]= {
 	"Synchronous Abort",
@@ -436,10 +442,19 @@ const char *esr_get_class_string(u32 esr)
 /*
  * bad_mode handles the impossible case in the exception vector.
  */
-asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr, unsigned long addr)
 {
 	siginfo_t info;
 	void __user *pc = (void __user *)instruction_pointer(regs);
+#ifdef CONFIG_KVMDEF
+	if(KVMDEF_ON&& check_pg(addr, KERPG, _UND_KVMDEF))
+		{
+			kdd("kvmdef: inst abort at addr 0x%016lx\n",addr);
+			//deal with kvmdef abort
+			kvmdef_map_threadinfo();
+			kvmdef_call_hyp(__kern_inv, regs);	//__kern_inv(regs)
+		}
+#endif
 	console_verbose();
 
 	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",

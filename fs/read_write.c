@@ -18,6 +18,7 @@
 #include <linux/compat.h>
 #include "internal.h"
 
+#include <linux/kvmdef.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 

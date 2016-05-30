@@ -81,6 +81,7 @@
 #include <linux/integrity.h>
 #include <linux/proc_ns.h>
 #include <linux/io.h>
+#include <linux/kvmdef.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -937,6 +938,9 @@ static int __ref kernel_init(void *unused)
 	/* need to finish all async __init code before freeing the memory */
 	async_synchronize_full();
 	free_initmem();
+#ifdef CONFIG_KVMDEF
+	mark_kvmdef_attr();	//mark kvmdef regions nx or ro or something else
+#endif
 	mark_rodata_ro();
 	system_state = SYSTEM_RUNNING;
 	numa_default_policy();

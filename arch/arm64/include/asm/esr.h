@@ -101,6 +101,10 @@
 #define ESR_ELx_WFx_ISS_WFE	(UL(1) << 0)
 #define ESR_ELx_xVC_IMM_MASK	((1UL << 16) - 1)
 
+#define ESR_ISS_RES0_HIGH4	(12)
+#define ESR_ISS_KVM_MASK	(UL(0xF)<<ESR_ISS_RES0_HIGH4)
+#define ESR_ISS_KVM_TAG		(UL(0xC)<<ESR_ISS_RES0_HIGH4)
+
 /* ESR value templates for specific events */
 
 /* BRK instruction trap from AArch64 state */

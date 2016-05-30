@@ -29,6 +29,7 @@
 #include <linux/sched.h>
 #include <linux/highmem.h>
 #include <linux/perf_event.h>
+#include <linux/kvmdef.h>
 
 #include <asm/cpufeature.h>
 #include <asm/exception.h>
@@ -38,6 +39,11 @@
 #include <asm/system_misc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#include <asm/kvmdef_asm.h>
+
+#ifdef CONFIG_KVMDEF
+extern int KVMDEF_ON;
+#endif
 
 static const char *fault_name(unsigned int esr);
 
@@ -465,9 +471,10 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 {
 	const struct fault_info *inf = fault_info + (esr & 63);
 	struct siginfo info;
-
-	if (!inf->fn(addr, esr, regs))
+	if (!inf->fn(addr, esr, regs)){
 		return;
+	}
+
 
 	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
 		 inf->name, esr, addr);
@@ -478,6 +485,39 @@ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 	info.si_addr  = (void __user *)addr;
 	arm64_notify_die("", regs, &info, esr);
 }
+#ifdef CONFIG_KVMDEF
+//deal with kvm mem abort
+asmlinkage void __exception do_kvmmem_abort(unsigned long addr, unsigned int esr,
+					 struct pt_regs *regs,unsigned long elraddr)
+{
+	const struct fault_info *inf = fault_info + (esr & 63);
+	struct siginfo info;
+	kdd("kvmdef: kvm inst @0x%016lx gen data abort mem addr 0x%016lx\n",elraddr,addr);
+	if(KVMDEF_ON&& check_pg(addr, KERPG, _IS_VALID)){
+		kdd("kvmdef: duplicate page table causing kvm mem_abort addr 0x%016lx\n",addr);
+		//deal with kvm abort -- map the aborted page
+		kvmdef_chk_map_page((void*)addr);
+		kvmdef_call_hyp(__kvm_mabort, regs);	//__kvm_mabort(regs)
+	}
+
+//same as do_mem_abort
+	if (!inf->fn(addr, esr, regs))
+		return;
+	pr_alert("Unhandled fault: %s (0x%08x) at 0x%016lx\n",
+		 inf->name, esr, addr);
+
+	info.si_signo = inf->sig;
+	info.si_errno = 0;
+	info.si_code  = inf->code;
+	info.si_addr  = (void __user *)addr;
+	arm64_notify_die("", regs, &info, esr);
+}
+#else
+asmlinkage void __exception do_kvmmem_abort(unsigned long addr, unsigned int esr,
+		 struct pt_regs *regs){
+	return;
+}
+#endif
 
 /*
  * Handle stack alignment exceptions.

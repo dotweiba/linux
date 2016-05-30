@@ -515,7 +515,7 @@ static inline pud_t *pud_offset(pgd_t *pgd, unsigned long addr)
 
 /* to find an entry in a kernel page-table-directory */
 #define pgd_offset_k(addr)	pgd_offset(&init_mm, addr)
-
+#define kvm_pgd_offset_k(addr) pgd_offset(&kvm_init_mm, addr)
 static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 {
 	const pteval_t mask = PTE_USER | PTE_PXN | PTE_UXN | PTE_RDONLY |

@@ -39,7 +39,7 @@
 #include <asm/tlb.h>
 #include <asm/memblock.h>
 #include <asm/mmu_context.h>
-
+#include <linux/kvmdef.h>
 #include "mm.h"
 
 u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
@@ -303,6 +303,12 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
 
 	return __create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK),
 				phys, virt, size, prot, late_alloc);
+}
+
+void create_mapping_late_public(phys_addr_t phys, unsigned long virt,
+		  phys_addr_t size, pgprot_t prot){
+	return __create_mapping(&init_mm, pgd_offset_k(virt & PAGE_MASK),
+					phys, virt, size, prot, late_alloc);
 }
 
 #ifdef CONFIG_DEBUG_RODATA

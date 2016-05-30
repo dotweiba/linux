@@ -8,6 +8,8 @@ CFLAGS_mmu.o := -I.
 
 KVM=../../../virt/kvm
 ARM=../../../arch/arm/kvm
+KVMDEF=.
+KVMVEC=.
 
 obj-$(CONFIG_KVM_ARM_HOST) += kvm.o
 
@@ -27,3 +29,5 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
 kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
 kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+
+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVMDEF)/kvmdef.o $(KVMDEF)/kvmdef_hyp.o $(KVMVEC)/kvmentry.o 

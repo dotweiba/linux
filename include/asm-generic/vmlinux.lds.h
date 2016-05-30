@@ -810,6 +810,15 @@
 		CACHELINE_ALIGNED_DATA(cacheline)			\
 		READ_MOSTLY_DATA(cacheline)				\
 		DATA_DATA						\
+		. = ALIGN(PAGE_SIZE);			\
+		VMLINUX_SYMBOL(__kvm_sdata) = .;		\
+		*(.kvm.data)					\
+		VMLINUX_SYMBOL(__kvm_edata) = .;		\
+		. = ALIGN(PAGE_SIZE);				\
+		VMLINUX_SYMBOL(__kvmdef_sdata) = .;		\
+		*(.kvmdef.data)							\
+		VMLINUX_SYMBOL(__kvmdef_edata) = .;		\
+		. = ALIGN(PAGE_SIZE);				\
 		CONSTRUCTORS						\
 	}
 

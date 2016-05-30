@@ -28,6 +28,7 @@
 #include <linux/sched.h>
 #include <linux/kvm.h>
 #include <trace/events/kvm.h>
+#include <linux/kvmdef.h>
 
 #define CREATE_TRACE_POINTS
 #include "trace.h"
@@ -44,6 +45,7 @@
 #include <asm/kvm_emulate.h>
 #include <asm/kvm_coproc.h>
 #include <asm/kvm_psci.h>
+#include <asm/kvmdef_asm.h>
 
 #ifdef REQUIRES_VIRT
 __asm__(".arch_extension	virt");
@@ -58,7 +60,9 @@ static DEFINE_PER_CPU(struct kvm_vcpu *, kvm_arm_running_vcpu);
 
 /* The VMID used in the VTTBR */
 static atomic64_t kvm_vmid_gen = ATOMIC64_INIT(1);
+
 static u8 kvm_next_vmid;
+
 static DEFINE_SPINLOCK(kvm_vmid_lock);
 
 static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
@@ -533,7 +537,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 {
 	int ret;
 	sigset_t sigsaved;
-
 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
 		return -ENOEXEC;
 
@@ -1066,14 +1069,22 @@ static int init_hyp_mode(void)
 		kvm_err("Cannot map world-switch code\n");
 		goto out_free_mappings;
 	}
-
+#ifdef CONFIG_KVMDEF
+	//Map the kvmdef hyp-code
+	err = create_hyp_mappings(__hyp_kvmdef_stext, __hyp_kvmdef_etext);
+	err = create_hyp_mappings(__kvmvec_stext, __kvmvec_etext);
+	//Map the kvm areas
+	err = create_hyp_mappings(__kvm_stext, __kvm_etext);
+	err = create_hyp_mappings(__kvm_sdata, __kvm_edata);
+	err = create_hyp_mappings(__kvmdef_stext, __kvmdef_etext);
+	err = create_hyp_mappings(__kvmdef_sdata, __kvmdef_edata);
+#endif
 	/*
 	 * Map the Hyp stack pages
 	 */
 	for_each_possible_cpu(cpu) {
 		char *stack_page = (char *)per_cpu(kvm_arm_hyp_stack_page, cpu);
 		err = create_hyp_mappings(stack_page, stack_page + PAGE_SIZE);
-
 		if (err) {
 			kvm_err("Cannot map hyp stack\n");
 			goto out_free_mappings;
@@ -1095,7 +1106,6 @@ static int init_hyp_mode(void)
 
 		cpu_ctxt = per_cpu_ptr(kvm_host_cpu_state, cpu);
 		err = create_hyp_mappings(cpu_ctxt, cpu_ctxt + 1);
-
 		if (err) {
 			kvm_err("Cannot map host CPU state: %d\n", err);
 			goto out_free_context;
@@ -1215,5 +1225,4 @@ static int arm_init(void)
 	int rc = kvm_init(NULL, sizeof(struct kvm_vcpu), 0, THIS_MODULE);
 	return rc;
 }
-
 module_init(arm_init);

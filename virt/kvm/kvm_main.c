@@ -62,7 +62,8 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/kvm.h>
-
+#include <linux/kvmdef.h>
+#include <linux/timekeeping.h>
 MODULE_AUTHOR("Qumranet");
 MODULE_LICENSE("GPL");
 
@@ -489,6 +490,7 @@ static struct kvm_memslots *kvm_alloc_memslots(void)
 	struct kvm_memslots *slots;
 
 	slots = kvm_kvzalloc(sizeof(struct kvm_memslots));
+//	kvmdef_mapping_range(slots,slots+1);
 	if (!slots)
 		return NULL;
 
@@ -685,7 +687,7 @@ void kvm_put_kvm(struct kvm *kvm)
 EXPORT_SYMBOL_GPL(kvm_put_kvm);
 
 
-static int kvm_vm_release(struct inode *inode, struct file *filp)
+static int __kvmtext kvm_vm_release(struct inode *inode, struct file *filp)
 {
 	struct kvm *kvm = filp->private_data;
 
@@ -704,6 +706,7 @@ static int kvm_create_dirty_bitmap(struct kvm_memory_slot *memslot)
 	unsigned long dirty_bytes = 2 * kvm_dirty_bitmap_bytes(memslot);
 
 	memslot->dirty_bitmap = kvm_kvzalloc(dirty_bytes);
+//	kvmdef_mapping_range(memslot->dirty_bitmap,memslot->dirty_bitmap+dirty_bytes);
 	if (!memslot->dirty_bitmap)
 		return -ENOMEM;
 
@@ -924,6 +927,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	}
 
 	slots = kvm_kvzalloc(sizeof(struct kvm_memslots));
+//	kvmdef_mapping_range(slots,slots+1);
 	if (!slots)
 		goto out_free;
 	memcpy(slots, __kvm_memslots(kvm, as_id), sizeof(struct kvm_memslots));
@@ -2219,13 +2223,13 @@ static const struct vm_operations_struct kvm_vcpu_vm_ops = {
 	.fault = kvm_vcpu_fault,
 };
 
-static int kvm_vcpu_mmap(struct file *file, struct vm_area_struct *vma)
+static int __kvmtext kvm_vcpu_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	vma->vm_ops = &kvm_vcpu_vm_ops;
 	return 0;
 }
 
-static int kvm_vcpu_release(struct inode *inode, struct file *filp)
+static int __kvmtext kvm_vcpu_release(struct inode *inode, struct file *filp)
 {
 	struct kvm_vcpu *vcpu = filp->private_data;
 
@@ -2329,9 +2333,17 @@ static int kvm_vcpu_ioctl_set_sigmask(struct kvm_vcpu *vcpu, sigset_t *sigset)
 	return 0;
 }
 
-static long kvm_vcpu_ioctl(struct file *filp,
+
+static long __kvmtext kvm_vcpu_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
+#ifdef TS_EVAL
+	struct timespec tv;;
+	getnstimeofday(&tv);
+	long  t= tv.tv_nsec;
+	pr_err("vcpu_ioctl: tv_sec+tv_usec %ld ns ENTRY \n", t);
+#endif
+
 	struct kvm_vcpu *vcpu = filp->private_data;
 	void __user *argp = (void __user *)arg;
 	int r;
@@ -2526,14 +2538,21 @@ out_free1:
 		r = kvm_arch_vcpu_ioctl(filp, ioctl, arg);
 	}
 out:
+
 	vcpu_put(vcpu);
 	kfree(fpu);
 	kfree(kvm_sregs);
+#ifdef TS_EVAL
+	struct timespec tv1;
+	getnstimeofday(&tv1);
+	long  t1=tv.tv_nsec;
+	pr_err("vcpu_ioctl: tv_sec+tv_usec %ld ns RET\n", t1);
+#endif
 	return r;
 }
 
 #ifdef CONFIG_KVM_COMPAT
-static long kvm_vcpu_compat_ioctl(struct file *filp,
+static long __kvmtext kvm_vcpu_compat_ioctl(struct file *filp,
 				  unsigned int ioctl, unsigned long arg)
 {
 	struct kvm_vcpu *vcpu = filp->private_data;
@@ -2577,7 +2596,7 @@ out:
 }
 #endif
 
-static int kvm_device_ioctl_attr(struct kvm_device *dev,
+static int __kvmtext kvm_device_ioctl_attr(struct kvm_device *dev,
 				 int (*accessor)(struct kvm_device *dev,
 						 struct kvm_device_attr *attr),
 				 unsigned long arg)
@@ -2597,7 +2616,6 @@ static long kvm_device_ioctl(struct file *filp, unsigned int ioctl,
 			     unsigned long arg)
 {
 	struct kvm_device *dev = filp->private_data;
-
 	switch (ioctl) {
 	case KVM_SET_DEVICE_ATTR:
 		return kvm_device_ioctl_attr(dev, dev->ops->set_attr, arg);
@@ -2608,12 +2626,12 @@ static long kvm_device_ioctl(struct file *filp, unsigned int ioctl,
 	default:
 		if (dev->ops->ioctl)
 			return dev->ops->ioctl(dev, ioctl, arg);
-
 		return -ENOTTY;
 	}
 }
 
-static int kvm_device_release(struct inode *inode, struct file *filp)
+
+static int __kvmtext kvm_device_release(struct inode *inode, struct file *filp)
 {
 	struct kvm_device *dev = filp->private_data;
 	struct kvm *kvm = dev->kvm;
@@ -2741,13 +2759,12 @@ static long kvm_vm_ioctl_check_extension_generic(struct kvm *kvm, long arg)
 	return kvm_vm_ioctl_check_extension(kvm, arg);
 }
 
-static long kvm_vm_ioctl(struct file *filp,
+static long __kvmtext kvm_vm_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
 	struct kvm *kvm = filp->private_data;
 	void __user *argp = (void __user *)arg;
 	int r;
-
 	if (kvm->mm != current->mm)
 		return -EIO;
 	switch (ioctl) {
@@ -2915,7 +2932,7 @@ struct compat_kvm_dirty_log {
 	};
 };
 
-static long kvm_vm_compat_ioctl(struct file *filp,
+static long __kvmtext kvm_vm_compat_ioctl(struct file *filp,
 			   unsigned int ioctl, unsigned long arg)
 {
 	struct kvm *kvm = filp->private_data;
@@ -2980,11 +2997,10 @@ static int kvm_dev_ioctl_create_vm(unsigned long type)
 	return r;
 }
 
-static long kvm_dev_ioctl(struct file *filp,
+static long __kvmtext kvm_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {
 	long r = -EINVAL;
-
 	switch (ioctl) {
 	case KVM_GET_API_VERSION:
 		if (arg)
@@ -3502,7 +3518,6 @@ struct kvm_vcpu *preempt_notifier_to_vcpu(struct preempt_notifier *pn)
 static void kvm_sched_in(struct preempt_notifier *pn, int cpu)
 {
 	struct kvm_vcpu *vcpu = preempt_notifier_to_vcpu(pn);
-
 	if (vcpu->preempted)
 		vcpu->preempted = false;
 
@@ -3515,7 +3530,6 @@ static void kvm_sched_out(struct preempt_notifier *pn,
 			  struct task_struct *next)
 {
 	struct kvm_vcpu *vcpu = preempt_notifier_to_vcpu(pn);
-
 	if (current->state == TASK_RUNNING)
 		vcpu->preempted = true;
 	kvm_arch_vcpu_put(vcpu);
@@ -3601,7 +3615,9 @@ int kvm_init(void *opaque, unsigned vcpu_size, unsigned vcpu_align,
 
 	r = kvm_vfio_ops_init();
 	WARN_ON(r);
-
+#ifdef CONFIG_KVMDEF
+	kvmdef_create_init_mapping();
+#endif
 	return 0;
 
 out_undebugfs:

@@ -105,7 +105,25 @@ SECTIONS
 			SCHED_TEXT
 			LOCK_TEXT
 			HYPERVISOR_TEXT
+			. = ALIGN(PAGE_SIZE);
+			VMLINUX_SYMBOL(__hyp_kvmdef_stext) = .;	
+			*(.hypkvmdef.text)
+			VMLINUX_SYMBOL(__hyp_kvmdef_etext) = .;		
+			. = ALIGN(PAGE_SIZE);
+			VMLINUX_SYMBOL(__kvmdef_stext) = .;
+			*(.kvmdef.text)
+			VMLINUX_SYMBOL(__kvmdef_etext) = .;
+			. = ALIGN(PAGE_SIZE);
 			IDMAP_TEXT
+			. = ALIGN(PAGE_SIZE);
+			VMLINUX_SYMBOL(__kvm_stext) = .;
+			*(.kvm.text)
+			VMLINUX_SYMBOL(__kvm_etext) = .;
+			. = ALIGN(PAGE_SIZE);
+			VMLINUX_SYMBOL(__kvmvec_stext) = .;
+			*(.kvmvectors)
+			VMLINUX_SYMBOL(__kvmvec_etext) = .;
+			. = ALIGN(PAGE_SIZE);
 			*(.fixup)
 			*(.gnu.warning)
 		. = ALIGN(16);

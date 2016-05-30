@@ -75,9 +75,9 @@ core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
 # Default target when executing plain make
 KBUILD_IMAGE	:= Image.gz
 KBUILD_DTBS	:= dtbs
-
+BOOTWRAPPER:=/home/wei/gitrepo/boot-wrapper/
 all:	$(KBUILD_IMAGE) $(KBUILD_DTBS)
-
+	$(MAKE) -C $(BOOTWRAPPER) link_img
 boot := arch/arm64/boot
 
 Image: vmlinux
